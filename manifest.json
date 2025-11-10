@@ -25,12 +25,19 @@
     }
   ],
   "commands": {
-    "toggle-tab-switcher": {
+    "tab-switcher-forward": {
       "suggested_key": {
         "default": "Ctrl+Q",
         "mac": "Command+Q"
       },
-      "description": "Toggle tab switcher"
+      "description": "Show tab switcher and go forward"
+    },
+    "tab-switcher-backward": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+Q",
+        "mac": "Command+Shift+Q"
+      },
+      "description": "Show tab switcher and go backward"
     },
     "copy-url": {
       "suggested_key": {

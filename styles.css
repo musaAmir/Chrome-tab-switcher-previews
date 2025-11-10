@@ -34,7 +34,7 @@
   gap: 8px;
   zoom: 1 !important;
   transform: scale(1) !important;
-  max-width: calc(5 * 160px + 4 * 8px + 24px);
+  max-width: calc(100vw - 200px);
   transition: none !important;
   animation: none !important;
 }
@@ -95,12 +95,17 @@
   gap: 4px !important;
   transform: none !important;
   zoom: 1 !important;
-  pointer-events: none !important;
-  cursor: default !important;
+  pointer-events: auto !important;
+  cursor: pointer !important;
   transition: none !important;
   animation: none !important;
   box-sizing: border-box !important;
   will-change: auto !important;
+}
+
+.arc-tab-card:hover {
+  background: rgba(255, 255, 255, 0.05) !important;
+  border-radius: 12px !important;
 }
 
 .arc-tab-card.selected {
@@ -117,6 +122,10 @@
   animation: none !important;
   box-sizing: border-box !important;
   will-change: auto !important;
+}
+
+.arc-tab-card.selected:hover {
+  background: rgba(59, 130, 246, 0.4) !important;
 }
 
 .arc-mru-badge {

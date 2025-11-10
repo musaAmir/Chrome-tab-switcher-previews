@@ -202,8 +202,10 @@ async function copyCurrentTabURL() {
 
 // Listen for keyboard command
 chrome.commands.onCommand.addListener(async (command) => {
-  if (command === "toggle-tab-switcher") {
-    toggleTabSwitcher();
+  if (command === "tab-switcher-forward") {
+    toggleTabSwitcher("forward");
+  } else if (command === "tab-switcher-backward") {
+    toggleTabSwitcher("backward");
   } else if (command === "copy-url") {
     await copyCurrentTabURL();
   }
@@ -265,7 +267,7 @@ async function ensureContentScript(tabId) {
 }
 
 // Toggle the tab switcher
-async function toggleTabSwitcher() {
+async function toggleTabSwitcher(direction = "forward") {
   try {
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
     
@@ -307,7 +309,8 @@ async function toggleTabSwitcher() {
       await chrome.tabs.sendMessage(tab.id, {
         action: "toggleSwitcher",
         tabs: tabsWithScreenshots,
-        currentTabId: tab.id
+        currentTabId: tab.id,
+        direction: direction
       });
     } catch (messageError) {
       console.error("Could not send message to tab:", messageError);

@@ -7,13 +7,19 @@ let selectedIndex = 0;
 let searchQuery = "";
 let autoSwitchTimer = null;
 
+// Track modifier key states
+let ctrlPressed = false;
+let metaPressed = false;
+let shiftPressed = false;
+let altPressed = false;
+
 // Calculate how many tabs can fit in the current window width
 function getMaxTabsForWidth() {
   const windowWidth = window.innerWidth;
   const tabWidth = 160; // Card width
   const tabGap = 8; // Gap between cards
   const containerPadding = 24; // 12px on each side
-  const minMargin = 40; // Minimum margin from window edges
+  const minMargin = 100; // 100px margin from window edges (user requested)
   
   // Available width for tabs
   const availableWidth = windowWidth - minMargin * 2 - containerPadding;
@@ -23,8 +29,8 @@ function getMaxTabsForWidth() {
   // availableWidth = n * (tabWidth + tabGap) - tabGap
   const maxTabs = Math.floor((availableWidth + tabGap) / (tabWidth + tabGap));
   
-  // Clamp between 1 and 5 (Arc/Zen browser default max)
-  return Math.max(1, Math.min(5, maxTabs));
+  // Minimum 1 tab, no maximum limit (removed the 5 tab limit)
+  return Math.max(1, maxTabs);
 }
 
 // Listen for messages from background script
@@ -35,6 +41,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     } else if (request.action === "toggleSwitcher") {
       currentTabs = request.tabs || [];
       currentTabId = request.currentTabId;
+      const direction = request.direction || "forward";
       
       // Limit tabs based on available window width
       const maxTabs = getMaxTabsForWidth();
@@ -42,18 +49,25 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       currentTabs = limitedTabs;
       
       if (switcherVisible) {
-        // Already visible, cycle to next tab
+        // Already visible, cycle to next or previous tab based on direction
         const filteredTabs = getFilteredTabs();
         if (filteredTabs.length > 0) {
-          selectedIndex = (selectedIndex + 1) % filteredTabs.length;
+          if (direction === "forward") {
+            selectedIndex = (selectedIndex + 1) % filteredTabs.length;
+          } else {
+            selectedIndex = (selectedIndex - 1 + filteredTabs.length) % filteredTabs.length;
+          }
           renderTabs();
           // Reset auto-switch timer
           startAutoSwitchTimer();
         }
       } else {
-        // Show UI immediately and start with second tab selected
-        // This mimics ctrlTab behavior where first tab shown is the previous tab
-        selectedIndex = currentTabs.length > 1 ? 1 : 0;
+        // Show UI immediately and start with second tab selected for forward, last for backward
+        if (direction === "forward") {
+          selectedIndex = currentTabs.length > 1 ? 1 : 0;
+        } else {
+          selectedIndex = currentTabs.length > 1 ? currentTabs.length - 1 : 0;
+        }
         showSwitcher();
         // Start timer to auto-switch if user stops pressing the key (simulates key release)
         startAutoSwitchTimer();
@@ -121,6 +135,12 @@ function hideSwitcher() {
   switcherVisible = false;
   searchQuery = "";
   
+  // Reset modifier key states
+  ctrlPressed = false;
+  metaPressed = false;
+  shiftPressed = false;
+  altPressed = false;
+  
   // Notify background that switcher is now hidden
   chrome.runtime.sendMessage({ action: "switcherHidden" });
 }
@@ -132,14 +152,8 @@ function startAutoSwitchTimer() {
     clearTimeout(autoSwitchTimer);
   }
   
-  // Set new timer - auto switch after 2000ms of inactivity (fallback in case keyup isn't detected)
-  // The primary exit mechanism is the Control/Meta keyup event
-  autoSwitchTimer = setTimeout(() => {
-    const filteredTabs = getFilteredTabs();
-    if (filteredTabs[selectedIndex]) {
-      switchToTab(filteredTabs[selectedIndex].id);
-    }
-  }, 2000);
+  // Removed the auto-switch timer - user should control when to switch via key release only
+  autoSwitchTimer = null;
 }
 
 // Render tabs in the grid
@@ -216,6 +230,13 @@ function renderTabs() {
     
     tabCard.dataset.tabIndex = index;
     
+    // Add mouse hover support - hover to select, key release to switch
+    tabCard.addEventListener('mouseenter', () => {
+      selectedIndex = index;
+      renderTabs();
+      // Selection is now updated, key release will switch to this tab
+    });
+    
     grid.appendChild(tabCard);
   });
   
@@ -249,6 +270,12 @@ function setupEventListeners() {
 
 // Handle global keydown when switcher is open
 function handleGlobalKeydown(e) {
+  // Track modifier key states
+  if (e.key === 'Control') ctrlPressed = true;
+  if (e.key === 'Meta') metaPressed = true;
+  if (e.key === 'Shift') shiftPressed = true;
+  if (e.key === 'Alt') altPressed = true;
+  
   if (!switcherVisible) return;
   
   // Only handle Escape - Ctrl+Q cycling is handled by background.js
@@ -260,19 +287,29 @@ function handleGlobalKeydown(e) {
 
 // Handle global keyup when switcher is open
 function handleGlobalKeyup(e) {
+  // Track modifier key states
+  if (e.key === 'Control') ctrlPressed = false;
+  if (e.key === 'Meta') metaPressed = false;  
+  if (e.key === 'Shift') shiftPressed = false;
+  if (e.key === 'Alt') altPressed = false;
+  
   if (!switcherVisible) return;
   
-  // When Control or Meta (Command) key is released, immediately switch to selected tab
-  if (e.key === 'Control' || e.key === 'Meta') {
+  // When any modifier key is released, check if all modifier keys are released
+  if (e.key === 'Control' || e.key === 'Meta' || e.key === 'Alt' || e.key === 'Shift') {
     e.preventDefault();
-    const filteredTabs = getFilteredTabs();
-    if (filteredTabs[selectedIndex]) {
-      // Cancel the timer and switch immediately
-      if (autoSwitchTimer) {
-        clearTimeout(autoSwitchTimer);
-        autoSwitchTimer = null;
+    
+    // Only switch if no modifier keys are being held (allow rapid cycling between shortcuts)
+    if (!ctrlPressed && !metaPressed && !altPressed && !shiftPressed) {
+      const filteredTabs = getFilteredTabs();
+      if (filteredTabs[selectedIndex]) {
+        // Cancel any timer and switch immediately
+        if (autoSwitchTimer) {
+          clearTimeout(autoSwitchTimer);
+          autoSwitchTimer = null;
+        }
+        switchToTab(filteredTabs[selectedIndex].id);
       }
-      switchToTab(filteredTabs[selectedIndex].id);
     }
   }
 }
@@ -347,8 +384,14 @@ function showToast(message) {
   }, 2000);
 }
 
-// Prevent keyboard shortcuts from triggering browser actions
+// Global key tracking for all pages
 document.addEventListener('keydown', (e) => {
+  // Track modifier key states globally
+  if (e.key === 'Control') ctrlPressed = true;
+  if (e.key === 'Meta') metaPressed = true;
+  if (e.key === 'Shift') shiftPressed = true;
+  if (e.key === 'Alt') altPressed = true;
+  
   // Prevent Ctrl+Q from triggering browser quit on Mac
   if ((e.metaKey || e.ctrlKey) && e.key === 'q') {
     e.preventDefault();
@@ -359,4 +402,13 @@ document.addEventListener('keydown', (e) => {
     e.preventDefault();
     e.stopPropagation();
   }
+}, true);
+
+// Global key release tracking
+document.addEventListener('keyup', (e) => {
+  // Track modifier key states globally
+  if (e.key === 'Control') ctrlPressed = false;
+  if (e.key === 'Meta') metaPressed = false;  
+  if (e.key === 'Shift') shiftPressed = false;
+  if (e.key === 'Alt') altPressed = false;
 }, true);
