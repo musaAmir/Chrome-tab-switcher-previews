@@ -214,90 +214,22 @@ select:focus {
   text-decoration: underline;
 }
 
-.shortcuts-note {
-  margin-top: 16px;
-  padding: 12px 16px;
-  background: #27272a;
-  border-radius: 8px;
-  font-size: 13px;
-  color: #a1a1aa;
-}
-
-.shortcuts-note p {
-  margin: 0;
-}
-
-.shortcuts-note strong {
-  color: #e4e4e7;
-}
-
-kbd {
+/* Shortcuts button */
+.shortcuts-btn {
   display: inline-block;
-  padding: 4px 8px;
-  font-family: inherit;
-  font-size: 12px;
-  font-weight: 500;
-  color: #e4e4e7;
-  background: #3f3f46;
-  border-radius: 6px;
-  border: 1px solid #52525b;
-  margin: 0 2px;
-}
-
-/* Hotkey button */
-.hotkey-btn {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
-  min-width: 120px;
-  padding: 12px 16px;
-  background: #27272a;
-  border: 2px solid #3f3f46;
-  border-radius: 8px;
-  cursor: pointer;
-  transition: border-color 0.15s, background-color 0.15s;
-}
-
-.hotkey-btn:hover {
-  border-color: #52525b;
-  background: #3f3f46;
-}
-
-.hotkey-btn:focus {
-  outline: none;
-  border-color: #3b82f6;
-  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
-}
-
-.hotkey-btn.recording {
-  border-color: #f97316;
-  background: rgba(249, 115, 22, 0.1);
-  animation: pulse 1s infinite;
-}
-
-@keyframes pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.7; }
-}
-
-.hotkey-value {
-  font-size: 14px;
-  font-weight: 600;
+  margin-top: 12px;
+  padding: 12px 20px;
+  background: #3b82f6;
   color: #ffffff;
+  font-size: 14px;
+  font-weight: 500;
+  text-decoration: none;
+  border-radius: 8px;
+  transition: background-color 0.15s;
 }
 
-.hotkey-hint {
-  font-size: 11px;
-  color: #71717a;
-}
-
-.hotkey-btn.recording .hotkey-value {
-  color: #f97316;
-}
-
-.hotkey-btn.recording .hotkey-hint {
-  color: #f97316;
+.shortcuts-btn:hover {
+  background: #2563eb;
 }
 
 /* Footer */

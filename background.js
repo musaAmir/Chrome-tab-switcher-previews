@@ -399,12 +399,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     chrome.tabs.update(request.tabId, { active: true })
       .then(() => sendResponse({ success: true }))
       .catch(error => sendResponse({ success: false, error: error.message }));
-    return true; // Will respond asynchronously
-  } else if (request.action === "closeTab") {
-    chrome.tabs.remove(request.tabId)
-      .then(() => sendResponse({ success: true }))
-      .catch(error => sendResponse({ success: false, error: error.message }));
-    return true; // Will respond asynchronously
+    return true;
   } else if (request.action === "getAllTabs") {
     chrome.tabs.query({ currentWindow: true })
       .then(tabs => sendResponse({ tabs: tabs }))

@@ -7,41 +7,14 @@ const defaultSettings = {
   theme: 'dark',
   accentColor: 'blue',
   maxTabs: 'auto',
-  showPreviews: true,
-  hotkeys: {
-    closeTab: 'w',
-    nextTab: 'ArrowRight',
-    prevTab: 'ArrowLeft'
-  }
+  showPreviews: true
 };
-
-// Map key codes to display names
-function getKeyDisplayName(key) {
-  const keyMap = {
-    'ArrowUp': 'Arrow Up',
-    'ArrowDown': 'Arrow Down',
-    'ArrowLeft': 'Arrow Left',
-    'ArrowRight': 'Arrow Right',
-    'Backspace': 'Backspace',
-    'Delete': 'Delete',
-    'Enter': 'Enter',
-    'Tab': 'Tab',
-    'Space': 'Space',
-    ' ': 'Space'
-  };
-  return keyMap[key] || key.toUpperCase();
-}
 
 // Load settings from storage
 async function loadSettings() {
   try {
     const result = await chrome.storage.local.get(SETTINGS_KEY);
-    const saved = result[SETTINGS_KEY] || {};
-    return {
-      ...defaultSettings,
-      ...saved,
-      hotkeys: { ...defaultSettings.hotkeys, ...(saved.hotkeys || {}) }
-    };
+    return { ...defaultSettings, ...(result[SETTINGS_KEY] || {}) };
   } catch (error) {
     console.error('Failed to load settings:', error);
     return defaultSettings;
@@ -86,60 +59,6 @@ function applySettingsToUI(settings) {
 
   // Show previews
   document.getElementById('showPreviews').checked = settings.showPreviews;
-
-  // Hotkeys
-  const hotkeys = settings.hotkeys || defaultSettings.hotkeys;
-  document.querySelector('#hotkeyCloseTab .hotkey-value').textContent = getKeyDisplayName(hotkeys.closeTab);
-  document.querySelector('#hotkeyNextTab .hotkey-value').textContent = getKeyDisplayName(hotkeys.nextTab);
-  document.querySelector('#hotkeyPrevTab .hotkey-value').textContent = getKeyDisplayName(hotkeys.prevTab);
-}
-
-// Setup hotkey recording for a button
-function setupHotkeyButton(btn, settings) {
-  const action = btn.dataset.action;
-  let isRecording = false;
-
-  btn.addEventListener('click', () => {
-    if (isRecording) return;
-
-    isRecording = true;
-    btn.classList.add('recording');
-    btn.querySelector('.hotkey-hint').textContent = 'Press a key...';
-
-    const handleKeydown = async (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-
-      // Ignore modifier keys alone
-      if (['Control', 'Alt', 'Shift', 'Meta'].includes(e.key)) {
-        return;
-      }
-
-      // Don't allow Escape as a hotkey (it's reserved for cancel)
-      if (e.key === 'Escape') {
-        // Cancel recording
-        isRecording = false;
-        btn.classList.remove('recording');
-        btn.querySelector('.hotkey-hint').textContent = 'Click to change';
-        document.removeEventListener('keydown', handleKeydown, true);
-        return;
-      }
-
-      // Save the new hotkey
-      settings.hotkeys[action] = e.key;
-      await saveSettings(settings);
-
-      // Update UI
-      btn.querySelector('.hotkey-value').textContent = getKeyDisplayName(e.key);
-      btn.querySelector('.hotkey-hint').textContent = 'Click to change';
-      btn.classList.remove('recording');
-      isRecording = false;
-
-      document.removeEventListener('keydown', handleKeydown, true);
-    };
-
-    document.addEventListener('keydown', handleKeydown, true);
-  });
 }
 
 // Initialize the options page
@@ -173,11 +92,6 @@ async function init() {
   document.getElementById('showPreviews').addEventListener('change', async (e) => {
     settings.showPreviews = e.target.checked;
     await saveSettings(settings);
-  });
-
-  // Setup hotkey buttons
-  document.querySelectorAll('.hotkey-btn').forEach(btn => {
-    setupHotkeyButton(btn, settings);
   });
 
   // Shortcuts link - open Chrome shortcuts page
