@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Arc Tab Switcher Settings</title>
+  <link rel="stylesheet" href="options.css">
+</head>
+<body>
+  <div class="container">
+    <header>
+      <img src="icon48.png" alt="Arc Tab Switcher" class="logo">
+      <h1>Arc Tab Switcher</h1>
+      <p class="version">Settings</p>
+    </header>
+
+    <main>
+      <section class="settings-group">
+        <h2>Appearance</h2>
+
+        <div class="setting-item">
+          <div class="setting-info">
+            <label for="theme">Theme</label>
+            <p class="setting-description">Choose the appearance of the tab switcher</p>
+          </div>
+          <select id="theme">
+            <option value="dark">Dark</option>
+            <option value="light">Light</option>
+            <option value="system">System</option>
+          </select>
+        </div>
+
+        <div class="setting-item">
+          <div class="setting-info">
+            <label for="accentColor">Accent Color</label>
+            <p class="setting-description">Highlight color for selected tabs</p>
+          </div>
+          <div class="color-options" id="accentColor">
+            <button class="color-btn" data-color="blue" style="background: #3b82f6;" title="Blue"></button>
+            <button class="color-btn" data-color="purple" style="background: #8b5cf6;" title="Purple"></button>
+            <button class="color-btn" data-color="pink" style="background: #ec4899;" title="Pink"></button>
+            <button class="color-btn" data-color="red" style="background: #ef4444;" title="Red"></button>
+            <button class="color-btn" data-color="orange" style="background: #f97316;" title="Orange"></button>
+            <button class="color-btn" data-color="green" style="background: #22c55e;" title="Green"></button>
+            <button class="color-btn" data-color="teal" style="background: #14b8a6;" title="Teal"></button>
+          </div>
+        </div>
+      </section>
+
+      <section class="settings-group">
+        <h2>Behavior</h2>
+
+        <div class="setting-item">
+          <div class="setting-info">
+            <label for="maxTabs">Maximum Tabs</label>
+            <p class="setting-description">Maximum number of tabs to show (auto adjusts to screen width)</p>
+          </div>
+          <select id="maxTabs">
+            <option value="auto">Auto (fit to screen)</option>
+            <option value="3">3 tabs</option>
+            <option value="5">5 tabs</option>
+            <option value="7">7 tabs</option>
+            <option value="10">10 tabs</option>
+          </select>
+        </div>
+
+        <div class="setting-item">
+          <div class="setting-info">
+            <label for="showPreviews">Show Tab Previews</label>
+            <p class="setting-description">Display screenshot previews of tabs</p>
+          </div>
+          <label class="toggle">
+            <input type="checkbox" id="showPreviews" checked>
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+      </section>
+
+      <section class="settings-group">
+        <h2>Keyboard Shortcuts</h2>
+        <p class="shortcuts-info">
+          Configure the main trigger shortcut in <a href="#" id="shortcutsLink">chrome://extensions/shortcuts</a>
+        </p>
+
+        <div class="setting-item">
+          <div class="setting-info">
+            <label>Close Tab</label>
+            <p class="setting-description">Key to close the selected tab while switcher is open</p>
+          </div>
+          <button class="hotkey-btn" id="hotkeyCloseTab" data-action="closeTab">
+            <span class="hotkey-value">W</span>
+            <span class="hotkey-hint">Click to change</span>
+          </button>
+        </div>
+
+        <div class="setting-item">
+          <div class="setting-info">
+            <label>Next Tab</label>
+            <p class="setting-description">Key to move selection to next tab</p>
+          </div>
+          <button class="hotkey-btn" id="hotkeyNextTab" data-action="nextTab">
+            <span class="hotkey-value">Arrow Right</span>
+            <span class="hotkey-hint">Click to change</span>
+          </button>
+        </div>
+
+        <div class="setting-item">
+          <div class="setting-info">
+            <label>Previous Tab</label>
+            <p class="setting-description">Key to move selection to previous tab</p>
+          </div>
+          <button class="hotkey-btn" id="hotkeyPrevTab" data-action="prevTab">
+            <span class="hotkey-value">Arrow Left</span>
+            <span class="hotkey-hint">Click to change</span>
+          </button>
+        </div>
+
+        <div class="shortcuts-note">
+          <p><strong>Note:</strong> These shortcuts work while the tab switcher is open. Press <kbd>Esc</kbd> to cancel.</p>
+        </div>
+      </section>
+    </main>
+
+    <footer>
+      <p class="save-status" id="saveStatus"></p>
+    </footer>
+  </div>
+
+  <script src="options.js"></script>
+</body>
+</html>

@@ -1,5 +1,19 @@
 /* Arc Tab Switcher Styles - Ultra Minimal MRU Design */
 
+/* Default CSS variables (dark theme) */
+:host {
+  --bg-primary: rgba(30, 30, 35, 0.98);
+  --bg-secondary: rgba(255, 255, 255, 0.04);
+  --bg-hover: rgba(255, 255, 255, 0.08);
+  --bg-selected: rgba(255, 255, 255, 0.06);
+  --text-primary: #ffffff;
+  --text-secondary: #a1a1aa;
+  --border-color: rgba(255, 255, 255, 0.1);
+  --shadow: 0 8px 32px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(255, 255, 255, 0.1);
+  --accent-color: #3b82f6;
+  --accent-hover: rgba(59, 130, 246, 0.3);
+}
+
 #arc-tab-switcher-overlay {
   position: fixed;
   top: 0;
@@ -24,9 +38,9 @@
 
 .arc-switcher-container {
   width: auto;
-  background: rgba(30, 30, 35, 0.98);
+  background: var(--bg-primary);
   border-radius: 12px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(255, 255, 255, 0.1);
+  box-shadow: var(--shadow);
   display: flex;
   flex-direction: row;
   padding: 12px;
@@ -104,14 +118,14 @@
 }
 
 .arc-tab-card:hover {
-  background: rgba(255, 255, 255, 0.05) !important;
+  background: var(--bg-hover) !important;
   border-radius: 12px !important;
 }
 
 .arc-tab-card.selected {
-  background: rgba(59, 130, 246, 0.3) !important;
+  background: var(--accent-hover) !important;
   border-radius: 12px !important;
-  box-shadow: none !important;
+  box-shadow: inset 0 0 0 2px var(--accent-color) !important;
   filter: none !important;
   backdrop-filter: none !important;
   width: 160px !important;
@@ -125,7 +139,7 @@
 }
 
 .arc-tab-card.selected:hover {
-  background: rgba(59, 130, 246, 0.4) !important;
+  background: var(--accent-hover) !important;
 }
 
 .arc-mru-badge {
@@ -151,6 +165,12 @@
   transition: none !important;
   animation: none !important;
   transform: none !important;
+}
+
+/* Light theme preview styling */
+.theme-light .arc-tab-preview {
+  background: rgba(240, 240, 245, 0.95);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
 .arc-tab-card.selected .arc-tab-preview {
@@ -192,7 +212,7 @@
 }
 
 .arc-tab-title {
-  color: #ffffff;
+  color: var(--text-primary);
   font-size: 12px !important;
   font-weight: 500;
   overflow: hidden;

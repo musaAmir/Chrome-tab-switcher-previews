@@ -1,13 +1,13 @@
 {
   "manifest_version": 3,
   "name": "Arc Tab Switcher",
-  "version": "2.5.0",
-  "description": "Minimal MRU tab switcher like Arc/Zen - cycle through your 5 most recent tabs instantly",
+  "version": "2.6.0",
+  "description": "Minimal MRU tab switcher like Arc/Zen - cycle through your most recent tabs instantly",
   "permissions": [
     "tabs",
     "scripting",
     "activeTab",
-    "clipboardWrite"
+    "storage"
   ],
   "host_permissions": [
     "<all_urls>"
@@ -19,37 +19,44 @@
     {
       "matches": ["<all_urls>"],
       "js": ["content.js"],
-      "css": ["styles.css"],
       "run_at": "document_end",
       "all_frames": false
     }
   ],
+  "options_page": "options.html",
+  "action": {
+    "default_icon": {
+      "16": "icon16.png",
+      "48": "icon48.png",
+      "128": "icon128.png"
+    },
+    "default_title": "Arc Tab Switcher Settings"
+  },
   "commands": {
     "tab-switcher-forward": {
       "suggested_key": {
-        "default": "Ctrl+Q",
-        "mac": "Command+Q"
+        "default": "Ctrl+2",
+        "mac": "Ctrl+2"
       },
       "description": "Show tab switcher and go forward"
     },
     "tab-switcher-backward": {
       "suggested_key": {
-        "default": "Ctrl+Shift+Q",
-        "mac": "Command+Shift+Q"
+        "default": "Ctrl+3",
+        "mac": "Ctrl+3"
       },
       "description": "Show tab switcher and go backward"
-    },
-    "copy-url": {
-      "suggested_key": {
-        "default": "Ctrl+Shift+C",
-        "mac": "Command+Shift+C"
-      },
-      "description": "Copy current page URL"
     }
   },
   "icons": {
     "16": "icon16.png",
     "48": "icon48.png",
     "128": "icon128.png"
-  }
+  },
+  "web_accessible_resources": [
+    {
+      "resources": ["styles.css", "icon*.png"],
+      "matches": ["<all_urls>"]
+    }
+  ]
 }
