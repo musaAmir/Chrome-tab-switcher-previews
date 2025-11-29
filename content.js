@@ -1,6 +1,7 @@
 // Content script for Arc Tab Switcher
 
 let switcherVisible = false;
+let shadowRoot = null;
 let currentTabs = [];
 let currentTabId = null;
 let selectedIndex = 0;
@@ -12,6 +13,26 @@ let ctrlPressed = false;
 let metaPressed = false;
 let shiftPressed = false;
 let altPressed = false;
+
+// Cleanup any existing instances (zombies)
+function cleanupZombies() {
+  const existingHost = document.getElementById('arc-tab-switcher-host');
+  if (existingHost) existingHost.remove();
+  const existingOverlay = document.getElementById('arc-tab-switcher-overlay');
+  if (existingOverlay) existingOverlay.remove();
+}
+cleanupZombies();
+
+// Reset keys on window blur
+window.addEventListener('blur', () => {
+  ctrlPressed = false;
+  metaPressed = false;
+  shiftPressed = false;
+  altPressed = false;
+  // Also close switcher if open? Maybe not, user might be alt-tabbing.
+  // But if they leave the window, the switcher is less relevant.
+  // For now just reset keys to prevent stuck modifiers.
+});
 
 // Calculate how many tabs can fit in the current window width
 function getMaxTabsForWidth() {
@@ -73,10 +94,6 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         startAutoSwitchTimer();
       }
       sendResponse({ success: true });
-    } else if (request.action === "copyURL") {
-      // Copy URL to clipboard and show toast
-      copyURLToClipboard(request.url);
-      sendResponse({ success: true });
     }
   } catch (error) {
     console.error("Error in message listener:", error);
@@ -88,12 +105,31 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 // Create and show the switcher overlay
 function showSwitcher() {
   if (switcherVisible) return;
+  cleanupZombies();
   
   switcherVisible = true;
   searchQuery = "";
   
   // Notify background that switcher is now visible
   chrome.runtime.sendMessage({ action: "switcherShown" });
+  
+  // Create host for Shadow DOM
+  const host = document.createElement('div');
+  host.id = 'arc-tab-switcher-host';
+  // Host needs to allow pointer events so children can receive them, 
+  // but usually 'pointer-events: none' on host and 'auto' on children works 
+  // if the host covers the screen.
+  // However, since we want the overlay to cover the screen, we'll make the host cover the screen.
+  host.style.cssText = 'position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 2147483647; pointer-events: none;';
+  document.body.appendChild(host);
+  
+  shadowRoot = host.attachShadow({ mode: 'open' });
+  
+  // Inject styles
+  const styleLink = document.createElement('link');
+  styleLink.rel = 'stylesheet';
+  styleLink.href = chrome.runtime.getURL('styles.css');
+  shadowRoot.appendChild(styleLink);
   
   // Create overlay container
   const overlay = document.createElement('div');
@@ -104,7 +140,7 @@ function showSwitcher() {
     </div>
   `;
   
-  document.body.appendChild(overlay);
+  shadowRoot.appendChild(overlay);
   
   // Render tabs
   renderTabs();
@@ -117,10 +153,11 @@ function showSwitcher() {
 function hideSwitcher() {
   if (!switcherVisible) return;
   
-  const overlay = document.getElementById('arc-tab-switcher-overlay');
-  if (overlay) {
-    overlay.remove();
+  const host = document.getElementById('arc-tab-switcher-host');
+  if (host) {
+    host.remove();
   }
+  shadowRoot = null;
   
   // Clean up global event listeners
   document.removeEventListener('keydown', handleGlobalKeydown);
@@ -158,7 +195,7 @@ function startAutoSwitchTimer() {
 
 // Render tabs in the grid
 function renderTabs() {
-  const grid = document.getElementById('arc-tabs-grid');
+  const grid = shadowRoot ? shadowRoot.getElementById('arc-tabs-grid') : null;
   if (!grid) return;
   
   const filteredTabs = getFilteredTabs();
@@ -192,23 +229,42 @@ function renderTabs() {
     const title = tab.title || 'Untitled';
     const displayTitle = title.length > 30 ? title.substring(0, 27) + '...' : title;
     
-    // Use real screenshot if available, otherwise create mock preview
+    // Use real screenshot if available, otherwise create informative fallback preview
     let previewSrc;
     if (tab.screenshot) {
       previewSrc = tab.screenshot;
     } else {
-      // Create a canvas-based preview that looks like a page
-      const favicon = tab.favIconUrl || 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16"><rect width="16" height="16" fill="%23ddd"/></svg>';
+      // Create a fallback preview showing the domain name
+      let domain = '';
+      try {
+        const url = new URL(tab.url || '');
+        domain = url.hostname.replace(/^www\./, '');
+        // Truncate long domains
+        if (domain.length > 25) {
+          domain = domain.substring(0, 22) + '...';
+        }
+      } catch (e) {
+        domain = 'New Tab';
+      }
+
+      // Escape the domain for use in SVG
+      const escapedDomain = domain.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
       previewSrc = `data:image/svg+xml,${encodeURIComponent(`
         <svg xmlns="http://www.w3.org/2000/svg" width="200" height="125" viewBox="0 0 200 125">
-          <rect width="200" height="125" fill="#ffffff"/>
-          <rect x="15" y="15" width="50" height="6" fill="#333" opacity="0.6"/>
-          <rect x="15" y="28" width="170" height="4" fill="#333" opacity="0.3"/>
-          <rect x="15" y="36" width="160" height="4" fill="#333" opacity="0.3"/>
-          <rect x="15" y="44" width="140" height="4" fill="#333" opacity="0.3"/>
-          <rect x="15" y="60" width="90" height="8" fill="#e5e7eb" rx="2"/>
-          <rect x="110" y="60" width="75" height="8" fill="#e5e7eb" rx="2"/>
-          <image href="${favicon}" x="15" y="15" width="20" height="20"/>
+          <defs>
+            <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" style="stop-color:#f8fafc"/>
+              <stop offset="100%" style="stop-color:#e2e8f0"/>
+            </linearGradient>
+          </defs>
+          <rect width="200" height="125" fill="url(#bg)"/>
+          <rect x="0" y="0" width="200" height="28" fill="#f1f5f9"/>
+          <circle cx="12" cy="14" r="5" fill="#ef4444" opacity="0.8"/>
+          <circle cx="28" cy="14" r="5" fill="#eab308" opacity="0.8"/>
+          <circle cx="44" cy="14" r="5" fill="#22c55e" opacity="0.8"/>
+          <text x="100" y="72" font-family="system-ui, -apple-system, sans-serif" font-size="13" fill="#475569" text-anchor="middle" font-weight="500">${escapedDomain}</text>
+          <text x="100" y="92" font-family="system-ui, -apple-system, sans-serif" font-size="10" fill="#94a3b8" text-anchor="middle">No preview available</text>
         </svg>
       `)}`;
     }
@@ -232,6 +288,7 @@ function renderTabs() {
     
     // Add mouse hover support - hover to select, key release to switch
     tabCard.addEventListener('mouseenter', () => {
+      console.log('Hovering over tab:', index);
       selectedIndex = index;
       renderTabs();
       // Selection is now updated, key release will switch to this tab
@@ -293,15 +350,19 @@ function handleGlobalKeyup(e) {
   if (e.key === 'Shift') shiftPressed = false;
   if (e.key === 'Alt') altPressed = false;
   
+  console.log('Key released:', e.key, 'Switcher visible:', switcherVisible);
+  
   if (!switcherVisible) return;
   
   // When any modifier key is released, check if all modifier keys are released
   if (e.key === 'Control' || e.key === 'Meta' || e.key === 'Alt' || e.key === 'Shift') {
     e.preventDefault();
+    console.log('Modifier key released. Ctrl:', ctrlPressed, 'Meta:', metaPressed, 'Alt:', altPressed, 'Shift:', shiftPressed);
     
     // Only switch if no modifier keys are being held (allow rapid cycling between shortcuts)
     if (!ctrlPressed && !metaPressed && !altPressed && !shiftPressed) {
       const filteredTabs = getFilteredTabs();
+      console.log('Switching to tab at index:', selectedIndex, 'Tab ID:', filteredTabs[selectedIndex]?.id);
       if (filteredTabs[selectedIndex]) {
         // Cancel any timer and switch immediately
         if (autoSwitchTimer) {
@@ -334,56 +395,6 @@ function escapeHtml(text) {
   return div.innerHTML;
 }
 
-// Copy URL to clipboard and show toast notification
-function copyURLToClipboard(url) {
-  navigator.clipboard.writeText(url).then(() => {
-    showToast('URL copied to clipboard');
-  }).catch(err => {
-    console.error('Failed to copy URL:', err);
-    showToast('Failed to copy URL');
-  });
-}
-
-// Show toast notification in top right corner
-function showToast(message) {
-  // Remove existing toast if any
-  const existingToast = document.getElementById('arc-url-copy-toast');
-  if (existingToast) {
-    existingToast.remove();
-  }
-  
-  // Create toast element
-  const toast = document.createElement('div');
-  toast.id = 'arc-url-copy-toast';
-  toast.textContent = message;
-  toast.style.cssText = `
-    position: fixed;
-    top: 20px;
-    right: 20px;
-    background: rgba(30, 30, 35, 0.95);
-    color: white;
-    padding: 12px 20px;
-    border-radius: 8px;
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-    font-size: 14px;
-    font-weight: 500;
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
-    z-index: 2147483647;
-    transition: opacity 0.3s ease;
-    pointer-events: none;
-  `;
-  
-  document.body.appendChild(toast);
-  
-  // Auto-remove after 2 seconds
-  setTimeout(() => {
-    toast.style.opacity = '0';
-    setTimeout(() => {
-      toast.remove();
-    }, 300);
-  }, 2000);
-}
-
 // Global key tracking for all pages
 document.addEventListener('keydown', (e) => {
   // Track modifier key states globally
@@ -394,11 +405,6 @@ document.addEventListener('keydown', (e) => {
   
   // Prevent Ctrl+Q from triggering browser quit on Mac
   if ((e.metaKey || e.ctrlKey) && e.key === 'q') {
-    e.preventDefault();
-    e.stopPropagation();
-  }
-  // Prevent Shift+Ctrl/Cmd+C default behavior
-  if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key === 'c') {
     e.preventDefault();
     e.stopPropagation();
   }

@@ -2,9 +2,113 @@
 
 // Track MRU (Most Recently Used) tab order
 let mruTabOrder = [];
+const MRU_CACHE_KEY = 'mruTabOrderV1';
 
-// Cache for tab screenshots
-let tabScreenshotCache = new Map();
+async function loadMRUOrder() {
+  try {
+    const stored = await chrome.storage.session.get(MRU_CACHE_KEY);
+    const savedOrder = stored[MRU_CACHE_KEY];
+    if (Array.isArray(savedOrder)) {
+      mruTabOrder = savedOrder;
+    }
+  } catch (error) {
+    console.warn('Failed to load MRU order', error);
+  }
+}
+
+async function persistMRUOrder() {
+  try {
+    await chrome.storage.session.set({ [MRU_CACHE_KEY]: mruTabOrder });
+  } catch (error) {
+    console.warn('Failed to persist MRU order', error);
+  }
+}
+
+function isRestrictedUrl(url = '') {
+  return url.startsWith('chrome://') ||
+         url.startsWith('chrome-extension://') ||
+         url.startsWith('edge://') ||
+         url.startsWith('about:') ||
+         url.startsWith('devtools://');
+}
+
+// Persisted screenshot cache using local storage (survives browser restarts)
+const SCREENSHOT_CACHE_KEY = 'tabScreenshotCacheV2'; // V2 for local storage migration
+const MAX_SCREENSHOT_CACHE_ITEMS = 25;
+let tabScreenshotCache = new Map(); // Map<tabId, { dataUrl, timestamp, url }>
+const cacheInitPromise = loadScreenshotCache();
+
+async function loadScreenshotCache() {
+  try {
+    const stored = await chrome.storage.local.get(SCREENSHOT_CACHE_KEY);
+    const entries = stored[SCREENSHOT_CACHE_KEY];
+    if (entries && typeof entries === 'object') {
+      Object.entries(entries).forEach(([id, entry]) => {
+        if (entry && entry.dataUrl) {
+          tabScreenshotCache.set(Number(id), entry);
+        }
+      });
+    }
+  } catch (error) {
+    // Best-effort load; fall back to empty cache
+    console.warn('Failed to load screenshot cache', error);
+  }
+}
+
+async function persistScreenshotCache() {
+  const plainObject = {};
+  for (const [id, entry] of tabScreenshotCache.entries()) {
+    plainObject[id] = entry;
+  }
+  try {
+    await chrome.storage.local.set({ [SCREENSHOT_CACHE_KEY]: plainObject });
+  } catch (error) {
+    console.warn('Failed to persist screenshot cache', error);
+  }
+}
+
+async function pruneScreenshotCache() {
+  if (tabScreenshotCache.size <= MAX_SCREENSHOT_CACHE_ITEMS) return;
+  const entries = Array.from(tabScreenshotCache.entries());
+  entries.sort((a, b) => (a[1].timestamp || 0) - (b[1].timestamp || 0));
+  while (tabScreenshotCache.size > MAX_SCREENSHOT_CACHE_ITEMS && entries.length) {
+    const [oldestId] = entries.shift();
+    tabScreenshotCache.delete(oldestId);
+  }
+  await persistScreenshotCache();
+}
+
+async function setScreenshot(tabId, dataUrl, url = null) {
+  await cacheInitPromise; // ensure we loaded any prior state
+  tabScreenshotCache.set(tabId, { dataUrl, timestamp: Date.now(), url });
+  await pruneScreenshotCache();
+  await persistScreenshotCache();
+}
+
+async function deleteScreenshot(tabId) {
+  await cacheInitPromise;
+  tabScreenshotCache.delete(tabId);
+  await persistScreenshotCache();
+}
+
+function getScreenshot(tabId, url = null) {
+  // First try by tab ID
+  const entry = tabScreenshotCache.get(tabId);
+  if (entry && entry.dataUrl) {
+    return entry.dataUrl;
+  }
+
+  // Fall back to URL match (useful after browser restart when tab IDs change)
+  if (url) {
+    for (const [, cachedEntry] of tabScreenshotCache.entries()) {
+      if (cachedEntry.url === url && cachedEntry.dataUrl) {
+        return cachedEntry.dataUrl;
+      }
+    }
+  }
+
+  return null;
+}
 
 // Track if the switcher is currently visible (to avoid capturing it in screenshots)
 let switcherVisible = false;
@@ -24,6 +128,7 @@ chrome.tabs.onActivated.addListener(async (activeInfo) => {
   if (mruTabOrder.length > 100) {
     mruTabOrder = mruTabOrder.slice(0, 100);
   }
+  persistMRUOrder();
   
   // Cancel any pending screenshot capture
   if (pendingScreenshotCapture) {
@@ -47,25 +152,19 @@ chrome.tabs.onActivated.addListener(async (activeInfo) => {
       }
       
       const tab = await chrome.tabs.get(tabId);
-      if (tab && !tab.url.startsWith('chrome://') && !tab.url.startsWith('chrome-extension://') && !tab.url.startsWith('edge://') && !tab.url.startsWith('about:')) {
+      if (tab && !isRestrictedUrl(tab.url)) {
         // Don't recapture the same tab immediately
         if (lastCapturedTabId === tabId) {
           return;
         }
         
         // Use regular captureVisibleTab for active tabs (faster, no debugger warning)
-        const dataUrl = await chrome.tabs.captureVisibleTab(activeInfo.windowId, { 
-          format: 'jpeg', 
-          quality: 50 
+        const dataUrl = await chrome.tabs.captureVisibleTab(activeInfo.windowId, {
+          format: 'jpeg',
+          quality: 50
         });
-        tabScreenshotCache.set(tabId, dataUrl);
+        await setScreenshot(tabId, dataUrl, tab.url);
         lastCapturedTabId = tabId;
-        
-        // Limit cache size to 20 most recent tabs
-        if (tabScreenshotCache.size > 20) {
-          const oldestKey = tabScreenshotCache.keys().next().value;
-          tabScreenshotCache.delete(oldestKey);
-        }
       }
     } catch (error) {
       // Ignore errors for restricted pages
@@ -78,7 +177,8 @@ chrome.tabs.onActivated.addListener(async (activeInfo) => {
 // Listen for tab removal to clean up MRU list and cache
 chrome.tabs.onRemoved.addListener((tabId) => {
   mruTabOrder = mruTabOrder.filter(id => id !== tabId);
-  tabScreenshotCache.delete(tabId);
+  persistMRUOrder();
+  deleteScreenshot(tabId);
   
   // Clear last captured tab if it was this one
   if (lastCapturedTabId === tabId) {
@@ -100,12 +200,12 @@ chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
           return;
         }
         
-        if (!tab.url.startsWith('chrome://') && !tab.url.startsWith('chrome-extension://') && !tab.url.startsWith('edge://') && !tab.url.startsWith('about:')) {
-          const dataUrl = await chrome.tabs.captureVisibleTab(tab.windowId, { 
-            format: 'jpeg', 
-            quality: 50 
+        if (!isRestrictedUrl(tab.url)) {
+          const dataUrl = await chrome.tabs.captureVisibleTab(tab.windowId, {
+            format: 'jpeg',
+            quality: 50
           });
-          tabScreenshotCache.set(tabId, dataUrl);
+          await setScreenshot(tabId, dataUrl, tab.url);
           lastCapturedTabId = tabId;
         }
       } catch (error) {
@@ -127,32 +227,49 @@ chrome.windows.onFocusChanged.addListener((windowId) => {
       const tabId = tabs[0].id;
       mruTabOrder = mruTabOrder.filter(id => id !== tabId);
       mruTabOrder.unshift(tabId);
+      persistMRUOrder();
     }
   });
 });
 
 // Initialize MRU list when extension loads
-chrome.tabs.query({}).then(tabs => {
-  // Get current active tabs per window
-  const activeTabIds = new Set();
-  tabs.forEach(tab => {
-    if (tab.active) {
-      activeTabIds.add(tab.id);
-    }
-  });
-  // Add active tabs first, then others
-  mruTabOrder = [...activeTabIds, ...tabs.filter(t => !activeTabIds.has(t.id)).map(t => t.id)];
+Promise.all([loadMRUOrder(), chrome.tabs.query({})]).then(([_, tabs]) => {
+  const allTabIds = new Set(tabs.map(t => t.id));
+  
+  // Filter stored MRU to only include currently existing tabs
+  let validMru = mruTabOrder.filter(id => allTabIds.has(id));
+  
+  // Identify currently active tabs
+  const activeTabs = tabs.filter(t => t.active);
+  const activeTabIds = new Set(activeTabs.map(t => t.id));
+
+  // If we have no valid MRU (fresh install or cleared), build from scratch
+  if (validMru.length === 0) {
+     validMru = [...activeTabIds, ...tabs.filter(t => !activeTabIds.has(t.id)).map(t => t.id)];
+  } else {
+     // Ensure current active tab(s) are at the front
+     validMru = validMru.filter(id => !activeTabIds.has(id));
+     validMru = [...activeTabIds, ...validMru];
+     
+     // Append any other tabs that were not in MRU
+     const knownIds = new Set(validMru);
+     const unknownTabs = tabs.filter(t => !knownIds.has(t.id)).map(t => t.id);
+     validMru = [...validMru, ...unknownTabs];
+  }
+  
+  mruTabOrder = validMru;
+  persistMRUOrder();
   
   // Capture screenshot of currently active tab in focused window
   const activeTab = tabs.find(t => t.active && t.windowId);
-  if (activeTab && !activeTab.url.startsWith('chrome://') && !activeTab.url.startsWith('chrome-extension://') && !activeTab.url.startsWith('edge://') && !activeTab.url.startsWith('about:')) {
+  if (activeTab && !isRestrictedUrl(activeTab.url)) {
     setTimeout(async () => {
       try {
-        const dataUrl = await chrome.tabs.captureVisibleTab(activeTab.windowId, { 
-          format: 'jpeg', 
-          quality: 50 
+        const dataUrl = await chrome.tabs.captureVisibleTab(activeTab.windowId, {
+          format: 'jpeg',
+          quality: 50
         });
-        tabScreenshotCache.set(activeTab.id, dataUrl);
+        await setScreenshot(activeTab.id, dataUrl, activeTab.url);
       } catch (error) {
         // Ignore errors
       }
@@ -160,54 +277,12 @@ chrome.tabs.query({}).then(tabs => {
   }
 });
 
-// Copy current tab URL to clipboard
-async function copyCurrentTabURL() {
-  try {
-    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-    
-    if (!tab || !tab.id) {
-      console.warn("No active tab found");
-      return;
-    }
-
-    // Check if tab URL is a restricted page
-    if (tab.url && (tab.url.startsWith('chrome://') || 
-                    tab.url.startsWith('chrome-extension://') ||
-                    tab.url.startsWith('edge://') ||
-                    tab.url.startsWith('about:'))) {
-      console.warn("Cannot copy URL from restricted pages:", tab.url);
-      return;
-    }
-    
-    // Ensure content script is loaded
-    const isLoaded = await ensureContentScript(tab.id);
-    if (!isLoaded) {
-      console.error("Could not load content script");
-      return;
-    }
-    
-    // Send message to content script to copy URL and show toast
-    try {
-      await chrome.tabs.sendMessage(tab.id, {
-        action: "copyURL",
-        url: tab.url
-      });
-    } catch (messageError) {
-      console.error("Could not send message to tab:", messageError);
-    }
-  } catch (error) {
-    console.error("Error copying URL:", error);
-  }
-}
-
 // Listen for keyboard command
 chrome.commands.onCommand.addListener(async (command) => {
   if (command === "tab-switcher-forward") {
     toggleTabSwitcher("forward");
   } else if (command === "tab-switcher-backward") {
     toggleTabSwitcher("backward");
-  } else if (command === "copy-url") {
-    await copyCurrentTabURL();
   }
 });
 
@@ -251,11 +326,6 @@ async function ensureContentScript(tabId) {
         files: ['content.js']
       });
       
-      await chrome.scripting.insertCSS({
-        target: { tabId: tabId },
-        files: ['styles.css']
-      });
-      
       // Give it a moment to initialize
       await new Promise(resolve => setTimeout(resolve, 50));
       return true;
@@ -269,6 +339,8 @@ async function ensureContentScript(tabId) {
 // Toggle the tab switcher
 async function toggleTabSwitcher(direction = "forward") {
   try {
+    await cacheInitPromise; // ensure screenshot cache restored before building UI
+
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
     
     if (!tab || !tab.id) {
@@ -277,10 +349,7 @@ async function toggleTabSwitcher(direction = "forward") {
     }
 
     // Check if tab URL is a restricted page
-    if (tab.url && (tab.url.startsWith('chrome://') || 
-                    tab.url.startsWith('chrome-extension://') ||
-                    tab.url.startsWith('edge://') ||
-                    tab.url.startsWith('about:'))) {
+    if (tab.url && isRestrictedUrl(tab.url)) {
       console.warn("Cannot run on restricted pages:", tab.url);
       return;
     }
@@ -298,10 +367,14 @@ async function toggleTabSwitcher(direction = "forward") {
     // Sort tabs by MRU order
     const sortedTabs = sortTabsByMRU(allTabs);
     
-    // Attach cached screenshots to tabs
-    const tabsWithScreenshots = sortedTabs.map(t => ({
+    // Optimization: Only send top 20 tabs to avoid massive payload with screenshots
+    // The UI calculates max based on width, but 20 is a safe upper bound for 4k screens
+    const tabsToSend = sortedTabs.slice(0, 20);
+    
+    // Attach cached screenshots to tabs (also try URL-based lookup for better cache hits)
+    const tabsWithScreenshots = tabsToSend.map(t => ({
       ...t,
-      screenshot: tabScreenshotCache.get(t.id) || null
+      screenshot: getScreenshot(t.id, t.url) || null
     }));
     
     // Send message to content script to show/hide switcher
@@ -357,12 +430,12 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             return;
           }
           
-          if (tab && tab.active && !tab.url.startsWith('chrome://') && !tab.url.startsWith('chrome-extension://') && !tab.url.startsWith('edge://') && !tab.url.startsWith('about:')) {
-            const dataUrl = await chrome.tabs.captureVisibleTab(tab.windowId, { 
-              format: 'jpeg', 
-              quality: 50 
+          if (tab && tab.active && !isRestrictedUrl(tab.url)) {
+            const dataUrl = await chrome.tabs.captureVisibleTab(tab.windowId, {
+              format: 'jpeg',
+              quality: 50
             });
-            tabScreenshotCache.set(sender.tab.id, dataUrl);
+            await setScreenshot(sender.tab.id, dataUrl, tab.url);
             lastCapturedTabId = sender.tab.id;
           }
         } catch (error) {
