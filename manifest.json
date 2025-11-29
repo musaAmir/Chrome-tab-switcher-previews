@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "Arc Tab Switcher",
+  "name": "Chrome Tab Switcher Previews",
   "version": "3.0.0",
-  "description": "Minimal MRU tab switcher like Arc/Zen - cycle through your most recent tabs instantly",
+  "description": "Fast tab switcher with real page previews - cycle through recent tabs instantly",
   "permissions": [
     "tabs",
     "scripting",
@@ -30,7 +30,7 @@
       "48": "icon48.png",
       "128": "icon128.png"
     },
-    "default_title": "Arc Tab Switcher Settings"
+    "default_title": "Chrome Tab Switcher Previews Settings"
   },
   "commands": {
     "tab-switcher-forward": {
