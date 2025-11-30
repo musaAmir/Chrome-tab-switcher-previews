@@ -191,11 +191,6 @@ async function showSwitcher() {
 
   shadowRoot = host.attachShadow({ mode: 'open' });
 
-  const styleLink = document.createElement('link');
-  styleLink.rel = 'stylesheet';
-  styleLink.href = chrome.runtime.getURL('styles.css');
-  shadowRoot.appendChild(styleLink);
-
   const themeStyle = document.createElement('style');
   themeStyle.textContent = getThemeStyles();
   shadowRoot.appendChild(themeStyle);
@@ -204,6 +199,7 @@ async function showSwitcher() {
   const overlay = document.createElement('div');
   overlay.id = 'arc-tab-switcher-overlay';
   overlay.className = `theme-${theme}`;
+  overlay.style.visibility = 'hidden'; // Hide until styles are loaded
   overlay.innerHTML = `
     <div class="arc-switcher-container">
       <div class="arc-tabs-grid" id="arc-tabs-grid"></div>
@@ -211,7 +207,22 @@ async function showSwitcher() {
   `;
 
   shadowRoot.appendChild(overlay);
+
+  // Load stylesheet and wait for it before showing
+  const styleLink = document.createElement('link');
+  styleLink.rel = 'stylesheet';
+  styleLink.href = chrome.runtime.getURL('styles.css');
+
+  await new Promise((resolve) => {
+    styleLink.onload = resolve;
+    styleLink.onerror = resolve; // Still show even if CSS fails
+    shadowRoot.insertBefore(styleLink, themeStyle);
+    // Fallback timeout in case onload doesn't fire
+    setTimeout(resolve, 50);
+  });
+
   renderTabs();
+  overlay.style.visibility = 'visible'; // Now show the fully styled content
   setupEventListeners();
 }
 
