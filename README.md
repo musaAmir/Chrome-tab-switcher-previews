@@ -4,7 +4,7 @@ A fast, minimal tab switcher for Chrome with real page previews. Cycle through y
 
 ## Features
 
-- **MRU Tab Switching** - Switch between your 5 most recently used tabs
+- **MRU Tab Switching** - Switch between your recently used tabs
 - **Real Page Previews** - Shows actual screenshots of your tabs
 - **Instant UI** - No animations or delays
 - **Keyboard Only** - Simple keyboard navigation
@@ -32,13 +32,6 @@ A fast, minimal tab switcher for Chrome with real page previews. Cycle through y
 - Release the modifier key (Ctrl/Cmd) to switch to the selected tab
 - Press Esc to cancel
 
-## Files
-
-- `manifest.json` - Extension configuration
-- `background.js` - Background service worker
-- `content.js` - Tab switcher UI logic
-- `styles.css` - Styling
-- `options.html` - Settings page
 
 ## License
 
