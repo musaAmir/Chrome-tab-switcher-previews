@@ -1,4 +1,4 @@
-/* Arc Tab Switcher Styles - Ultra Minimal MRU Design */
+/* Tab Switcher Previews styles */
 
 /* Default CSS variables (dark theme) */
 :host {
@@ -12,9 +12,12 @@
   --shadow: 0 8px 32px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(255, 255, 255, 0.1);
   --accent-color: #3b82f6;
   --accent-hover: rgba(59, 130, 246, 0.3);
+  --tab-card-width: 160px;
+  --tab-card-height: 140px;
+  --tab-preview-height: 96px;
 }
 
-#arc-tab-switcher-overlay {
+#tab-switcher-overlay {
   position: fixed;
   top: 0;
   left: 0;
@@ -36,7 +39,7 @@
   -webkit-text-size-adjust: 100% !important;
 }
 
-.arc-switcher-container {
+.tab-switcher-container {
   width: auto;
   background: var(--bg-primary);
   border-radius: 12px;
@@ -53,27 +56,27 @@
   animation: none !important;
 }
 
-.arc-switcher-header {
+.tab-switcher-header {
   display: none;
 }
 
-.arc-search-container {
+.tab-switcher-search {
   display: none;
 }
 
-.arc-search-icon {
+.tab-switcher-search-icon {
   display: none;
 }
 
-#arc-search-input {
+#tab-switcher-search-input {
   display: none;
 }
 
-.arc-hint {
+.tab-switcher-hint {
   display: none;
 }
 
-.arc-tabs-grid {
+.tab-switcher-grid {
   display: flex;
   flex-direction: row;
   gap: 8px;
@@ -84,11 +87,11 @@
 }
 
 /* Hide scrollbar */
-.arc-tabs-grid::-webkit-scrollbar {
+.tab-switcher-grid::-webkit-scrollbar {
   display: none;
 }
 
-.arc-tab-card {
+.tab-switcher-card {
   background: transparent;
   border: none;
   border-radius: 8px;
@@ -96,12 +99,12 @@
   position: relative;
   overflow: visible;
   flex-shrink: 0;
-  width: 160px !important;
-  height: 140px !important;
-  min-width: 160px !important;
-  max-width: 160px !important;
-  min-height: 140px !important;
-  max-height: 140px !important;
+  width: var(--tab-card-width) !important;
+  height: var(--tab-card-height) !important;
+  min-width: var(--tab-card-width) !important;
+  max-width: var(--tab-card-width) !important;
+  min-height: var(--tab-card-height) !important;
+  max-height: var(--tab-card-height) !important;
   display: flex !important;
   flex-direction: column !important;
   align-items: stretch !important;
@@ -117,19 +120,19 @@
   will-change: auto !important;
 }
 
-.arc-tab-card:hover {
+.tab-switcher-card:hover {
   background: var(--bg-hover) !important;
   border-radius: 12px !important;
 }
 
-.arc-tab-card.selected {
+.tab-switcher-card.selected {
   background: var(--accent-hover) !important;
   border-radius: 12px !important;
   box-shadow: inset 0 0 0 2px var(--accent-color) !important;
   filter: none !important;
   backdrop-filter: none !important;
-  width: 160px !important;
-  height: 140px !important;
+  width: var(--tab-card-width) !important;
+  height: var(--tab-card-height) !important;
   padding: 10px !important;
   transform: none !important;
   transition: none !important;
@@ -138,19 +141,19 @@
   will-change: auto !important;
 }
 
-.arc-tab-card.selected:hover {
+.tab-switcher-card.selected:hover {
   background: var(--accent-hover) !important;
 }
 
-.arc-mru-badge {
+.tab-switcher-mru-badge {
   display: none;
 }
 
-.arc-tab-preview {
+.tab-switcher-preview {
   width: 100% !important;
-  height: 96px !important;
-  min-height: 96px !important;
-  max-height: 96px !important;
+  height: var(--tab-preview-height) !important;
+  min-height: var(--tab-preview-height) !important;
+  max-height: var(--tab-preview-height) !important;
   position: relative;
   background: rgba(255, 255, 255, 0.95);
   display: flex;
@@ -168,16 +171,16 @@
 }
 
 /* Light theme preview styling */
-.theme-light .arc-tab-preview {
+.theme-light .tab-switcher-preview {
   background: rgba(240, 240, 245, 0.95);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
-.arc-tab-card.selected .arc-tab-preview {
+.tab-switcher-card.selected .tab-switcher-preview {
   width: 100% !important;
-  height: 96px !important;
-  min-height: 96px !important;
-  max-height: 96px !important;
+  height: var(--tab-preview-height) !important;
+  min-height: var(--tab-preview-height) !important;
+  max-height: var(--tab-preview-height) !important;
   margin-top: 0 !important;
   margin-bottom: 0 !important;
   transition: none !important;
@@ -185,18 +188,18 @@
   transform: none !important;
 }
 
-.arc-tab-preview img {
+.tab-switcher-preview img {
   width: 100%;
   height: 100%;
   object-fit: cover;
   display: block;
 }
 
-.arc-tab-favicon-large {
+.tab-switcher-favicon-large {
   display: none;
 }
 
-.arc-tab-info {
+.tab-switcher-info {
   width: 100% !important;
   padding: 6px 4px 4px 4px !important;
   background: transparent !important;
@@ -211,7 +214,7 @@
   flex-shrink: 0 !important;
 }
 
-.arc-tab-title {
+.tab-switcher-title {
   color: var(--text-primary);
   font-size: 12px !important;
   font-weight: 500;
@@ -229,7 +232,7 @@
   padding: 0 !important;
 }
 
-.arc-tab-favicon {
+.tab-switcher-favicon {
   width: 14px !important;
   height: 14px !important;
   flex-shrink: 0 !important;
@@ -239,7 +242,7 @@
   transform: none !important;
 }
 
-.arc-tab-title span {
+.tab-switcher-title span {
   overflow: hidden !important;
   text-overflow: ellipsis !important;
   white-space: nowrap !important;
@@ -248,22 +251,22 @@
   transform: none !important;
 }
 
-.arc-tab-url {
+.tab-switcher-url {
   display: none;
 }
 
-.arc-current-badge {
+.tab-switcher-current-badge {
   display: none;
 }
 
-.arc-no-results {
+.tab-switcher-empty {
   display: none;
 }
 
 /* Box sizing reset and disable all animations */
-#arc-tab-switcher-overlay *,
-#arc-tab-switcher-overlay *::before,
-#arc-tab-switcher-overlay *::after {
+#tab-switcher-overlay *,
+#tab-switcher-overlay *::before,
+#tab-switcher-overlay *::after {
   box-sizing: border-box;
   transition: none !important;
   animation: none !important;
@@ -271,4 +274,3 @@
   transform-origin: center !important;
   -webkit-text-size-adjust: 100% !important;
 }
-

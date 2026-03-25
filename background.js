@@ -1,4 +1,4 @@
-// Background service worker for Arc Tab Switcher
+// Background service worker for Tab Switcher Previews
 
 // Track MRU (Most Recently Used) tab order
 let mruTabOrder = [];
@@ -113,9 +113,41 @@ function getScreenshot(tabId, url = null) {
 // Track if the switcher is currently visible (to avoid capturing it in screenshots)
 let switcherVisible = false;
 
-// Track pending screenshot captures to prevent race conditions
-let pendingScreenshotCapture = null;
-let lastCapturedTabId = null;
+// Centralized screenshot capture system to prevent race conditions
+let captureInProgress = false;
+let pendingCaptureTimeout = null;
+
+async function captureScreenshot(tabId, windowId) {
+  if (captureInProgress || switcherVisible) return;
+  captureInProgress = true;
+  try {
+    const [currentActiveTab] = await chrome.tabs.query({ active: true, windowId });
+    if (!currentActiveTab || currentActiveTab.id !== tabId) return;
+
+    const tab = await chrome.tabs.get(tabId);
+    if (!tab || isRestrictedUrl(tab.url)) return;
+
+    const dataUrl = await chrome.tabs.captureVisibleTab(windowId, {
+      format: 'jpeg',
+      quality: 50
+    });
+    await setScreenshot(tabId, dataUrl, tab.url);
+  } catch (error) {
+    // Ignore errors for restricted pages
+  } finally {
+    captureInProgress = false;
+  }
+}
+
+function scheduleCaptureScreenshot(tabId, windowId, delay = 500) {
+  if (pendingCaptureTimeout) {
+    clearTimeout(pendingCaptureTimeout);
+  }
+  pendingCaptureTimeout = setTimeout(() => {
+    pendingCaptureTimeout = null;
+    captureScreenshot(tabId, windowId);
+  }, delay);
+}
 
 // Listen for tab activation to maintain MRU order and capture screenshot
 chrome.tabs.onActivated.addListener(async (activeInfo) => {
@@ -129,49 +161,9 @@ chrome.tabs.onActivated.addListener(async (activeInfo) => {
     mruTabOrder = mruTabOrder.slice(0, 100);
   }
   persistMRUOrder();
-  
-  // Cancel any pending screenshot capture
-  if (pendingScreenshotCapture) {
-    clearTimeout(pendingScreenshotCapture);
-    pendingScreenshotCapture = null;
-  }
-  
+
   // Capture screenshot of newly active tab after a delay
-  // Don't capture if switcher is visible (would include switcher overlay in screenshot)
-  pendingScreenshotCapture = setTimeout(async () => {
-    if (switcherVisible) {
-      return; // Skip capture while switcher is visible
-    }
-    
-    // Double-check this is still the active tab
-    try {
-      const [currentActiveTab] = await chrome.tabs.query({ active: true, windowId: activeInfo.windowId });
-      if (!currentActiveTab || currentActiveTab.id !== tabId) {
-        // Tab is no longer active, don't capture
-        return;
-      }
-      
-      const tab = await chrome.tabs.get(tabId);
-      if (tab && !isRestrictedUrl(tab.url)) {
-        // Don't recapture the same tab immediately
-        if (lastCapturedTabId === tabId) {
-          return;
-        }
-        
-        // Use regular captureVisibleTab for active tabs (faster, no debugger warning)
-        const dataUrl = await chrome.tabs.captureVisibleTab(activeInfo.windowId, {
-          format: 'jpeg',
-          quality: 50
-        });
-        await setScreenshot(tabId, dataUrl, tab.url);
-        lastCapturedTabId = tabId;
-      }
-    } catch (error) {
-      // Ignore errors for restricted pages
-    }
-    
-    pendingScreenshotCapture = null;
-  }, 800); // Increased delay to 800ms to let page settle
+  scheduleCaptureScreenshot(tabId, activeInfo.windowId, 800);
 });
 
 // Listen for tab removal to clean up MRU list and cache
@@ -179,39 +171,13 @@ chrome.tabs.onRemoved.addListener((tabId) => {
   mruTabOrder = mruTabOrder.filter(id => id !== tabId);
   persistMRUOrder();
   deleteScreenshot(tabId);
-  
-  // Clear last captured tab if it was this one
-  if (lastCapturedTabId === tabId) {
-    lastCapturedTabId = null;
-  }
 });
 
 // Listen for tab updates (URL changes, page load completion)
 chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
   // Capture screenshot when page finishes loading and tab is active
-  // Don't capture if switcher is visible (would include switcher overlay in screenshot)
-  if (changeInfo.status === 'complete' && tab.active && tab.windowId !== undefined && !switcherVisible) {
-    // Wait a bit for page to fully render
-    setTimeout(async () => {
-      try {
-        // Double-check tab is still active
-        const [currentActiveTab] = await chrome.tabs.query({ active: true, windowId: tab.windowId });
-        if (!currentActiveTab || currentActiveTab.id !== tabId) {
-          return;
-        }
-        
-        if (!isRestrictedUrl(tab.url)) {
-          const dataUrl = await chrome.tabs.captureVisibleTab(tab.windowId, {
-            format: 'jpeg',
-            quality: 50
-          });
-          await setScreenshot(tabId, dataUrl, tab.url);
-          lastCapturedTabId = tabId;
-        }
-      } catch (error) {
-        // Ignore errors for restricted pages
-      }
-    }, 500);
+  if (changeInfo.status === 'complete' && tab.active && tab.windowId !== undefined) {
+    scheduleCaptureScreenshot(tabId, tab.windowId, 500);
   }
 });
 
@@ -262,19 +228,11 @@ Promise.all([loadMRUOrder(), chrome.tabs.query({})]).then(([_, tabs]) => {
   
   // Capture screenshot of currently active tab in focused window
   const activeTab = tabs.find(t => t.active && t.windowId);
-  if (activeTab && !isRestrictedUrl(activeTab.url)) {
-    setTimeout(async () => {
-      try {
-        const dataUrl = await chrome.tabs.captureVisibleTab(activeTab.windowId, {
-          format: 'jpeg',
-          quality: 50
-        });
-        await setScreenshot(activeTab.id, dataUrl, activeTab.url);
-      } catch (error) {
-        // Ignore errors
-      }
-    }, 500);
+  if (activeTab) {
+    scheduleCaptureScreenshot(activeTab.id, activeTab.windowId, 500);
   }
+}).catch(error => {
+  console.error('MRU initialization failed:', error);
 });
 
 // Listen for keyboard command
@@ -405,6 +363,11 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       .then(tabs => sendResponse({ tabs: tabs }))
       .catch(error => sendResponse({ tabs: [], error: error.message }));
     return true; // Will respond asynchronously
+  } else if (request.action === "openInNewTab") {
+    chrome.tabs.create({ url: request.url })
+      .then(() => sendResponse({ success: true }))
+      .catch(error => sendResponse({ success: false, error: error.message }));
+    return true;
   } else if (request.action === "switcherShown") {
     // Switcher is now visible - don't capture screenshots
     switcherVisible = true;
@@ -412,31 +375,14 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   } else if (request.action === "switcherHidden") {
     // Switcher is now hidden - can capture screenshots again
     switcherVisible = false;
-    
+
     // Capture screenshot of the newly active tab after switcher is hidden
     if (sender.tab && sender.tab.id) {
-      setTimeout(async () => {
-        try {
-          const tab = await chrome.tabs.get(sender.tab.id);
-          
-          // Double-check this tab is still active
-          const [currentActiveTab] = await chrome.tabs.query({ active: true, windowId: tab.windowId });
-          if (!currentActiveTab || currentActiveTab.id !== sender.tab.id) {
-            return;
-          }
-          
-          if (tab && tab.active && !isRestrictedUrl(tab.url)) {
-            const dataUrl = await chrome.tabs.captureVisibleTab(tab.windowId, {
-              format: 'jpeg',
-              quality: 50
-            });
-            await setScreenshot(sender.tab.id, dataUrl, tab.url);
-            lastCapturedTabId = sender.tab.id;
-          }
-        } catch (error) {
-          // Ignore errors
+      chrome.tabs.get(sender.tab.id).then(tab => {
+        if (tab && tab.active) {
+          scheduleCaptureScreenshot(sender.tab.id, tab.windowId, 500);
         }
-      }, 500);
+      }).catch(() => {});
     }
     sendResponse({ success: true });
   }

@@ -1,6 +1,6 @@
-# Chrome Tab Switcher Previews
+# Tab Switcher Previews
 
-A fast, minimal tab switcher for Chrome with real page previews. Cycle through your most recently used tabs instantly.
+A fast, minimal tab switcher for Chromium-based browsers with real page previews. Cycle through your most recently used tabs instantly.
 
 ## Features
 
@@ -10,6 +10,7 @@ A fast, minimal tab switcher for Chrome with real page previews. Cycle through y
 - **Keyboard Only** - Simple keyboard navigation
 - **Customizable Shortcuts** - Set your preferred key combinations
 - **Settings Page** - Configure hotkeys and appearance
+- **Peek Links** - Preview supported links in an overlay and open blocked sites in a new tab
 
 ## Installation
 
@@ -22,7 +23,7 @@ A fast, minimal tab switcher for Chrome with real page previews. Cycle through y
 ## Setup Keyboard Shortcuts
 
 1. Go to `chrome://extensions/shortcuts`
-2. Find "Chrome Tab Switcher Previews"
+2. Find "Tab Switcher Previews"
 3. Set your preferred shortcuts for forward/backward navigation
 
 ## Usage
@@ -31,6 +32,13 @@ A fast, minimal tab switcher for Chrome with real page previews. Cycle through y
 - Keep pressing to cycle through tabs
 - Release the modifier key (Ctrl/Cmd) to switch to the selected tab
 - Press Esc to cancel
+- Hold the configured peek modifier and click a link to preview it when the destination allows embedding
+
+## Privacy
+
+- Screenshot previews are stored locally on the device with `chrome.storage.local`
+- Settings and MRU tab ordering stay local to the browser profile
+- The extension does not send browsing data to any remote server
 
 
 ## License

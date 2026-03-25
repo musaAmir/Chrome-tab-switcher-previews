@@ -3,18 +3,42 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Arc Tab Switcher Settings</title>
+  <title>Tab Switcher Previews - Settings</title>
   <link rel="stylesheet" href="options.css">
 </head>
 <body>
   <div class="container">
     <header>
-      <img src="icon48.png" alt="Arc Tab Switcher" class="logo">
-      <h1>Arc Tab Switcher</h1>
+      <img src="icon48.png" alt="Tab Switcher Previews" class="logo">
+      <h1>Tab Switcher Previews</h1>
       <p class="version">Settings</p>
     </header>
 
     <main>
+      <section class="settings-group info-section">
+        <h2>Getting Started</h2>
+        <div class="info-block">
+          <h3>Tab Previews</h3>
+          <p>Quickly switch between your most recently used tabs with live screenshot previews. The switcher shows your tabs ordered by last use, so your most relevant tabs are always one shortcut away.</p>
+          <p>Previews are captured automatically as you browse. Tabs you haven't visited yet will show a placeholder until you switch to them.</p>
+        </div>
+        <div class="info-block">
+          <h3>Setup Required: Keyboard Shortcuts</h3>
+          <p>To use the tab switcher, you need to set a keyboard shortcut in Chrome. The extension doesn't have a default shortcut enabled by Chrome — you must assign one manually:</p>
+          <ol>
+            <li>Click the button below or go to <strong>chrome://extensions/shortcuts</strong></li>
+            <li>Find <strong>Tab Switcher Previews</strong></li>
+            <li>Set a shortcut for "Show tab switcher and go forward" (e.g. <kbd>Ctrl+Tab</kbd>)</li>
+            <li>Optionally set one for "Show tab switcher and go backward"</li>
+          </ol>
+          <a href="#" id="shortcutsLinkTop" class="shortcuts-btn">Open Keyboard Shortcuts</a>
+        </div>
+        <div class="info-block">
+          <h3>Peek</h3>
+          <p>Hold a modifier key and click any link to preview it in a floating panel without leaving your current page. If a site disallows embedding, the extension will offer to open it in a normal tab instead.</p>
+        </div>
+      </section>
+
       <section class="settings-group">
         <h2>Appearance</h2>
 
@@ -35,14 +59,25 @@
             <label for="accentColor">Accent Color</label>
             <p class="setting-description">Highlight color for selected tabs</p>
           </div>
-          <div class="color-options" id="accentColor">
-            <button class="color-btn" data-color="blue" style="background: #3b82f6;" title="Blue"></button>
-            <button class="color-btn" data-color="purple" style="background: #8b5cf6;" title="Purple"></button>
-            <button class="color-btn" data-color="pink" style="background: #ec4899;" title="Pink"></button>
-            <button class="color-btn" data-color="red" style="background: #ef4444;" title="Red"></button>
-            <button class="color-btn" data-color="orange" style="background: #f97316;" title="Orange"></button>
-            <button class="color-btn" data-color="green" style="background: #22c55e;" title="Green"></button>
-            <button class="color-btn" data-color="teal" style="background: #14b8a6;" title="Teal"></button>
+          <div class="color-options" id="accentColor" role="group" aria-label="Accent color options">
+            <button class="color-btn" data-color="blue" style="background: #3b82f6;" title="Blue" aria-label="Blue accent color"></button>
+            <button class="color-btn" data-color="purple" style="background: #8b5cf6;" title="Purple" aria-label="Purple accent color"></button>
+            <button class="color-btn" data-color="pink" style="background: #ec4899;" title="Pink" aria-label="Pink accent color"></button>
+            <button class="color-btn" data-color="red" style="background: #ef4444;" title="Red" aria-label="Red accent color"></button>
+            <button class="color-btn" data-color="orange" style="background: #f97316;" title="Orange" aria-label="Orange accent color"></button>
+            <button class="color-btn" data-color="green" style="background: #22c55e;" title="Green" aria-label="Green accent color"></button>
+            <button class="color-btn" data-color="teal" style="background: #14b8a6;" title="Teal" aria-label="Teal accent color"></button>
+          </div>
+        </div>
+
+        <div class="setting-item">
+          <div class="setting-info">
+            <label for="previewSize">Preview Size</label>
+            <p class="setting-description">Adjust the size of the tab preview cards</p>
+          </div>
+          <div class="slider-control">
+            <input type="range" id="previewSize" min="75" max="150" step="5" value="100">
+            <span class="slider-value" id="previewSizeValue">100%</span>
           </div>
         </div>
       </section>
@@ -73,6 +108,44 @@
             <input type="checkbox" id="showPreviews" checked>
             <span class="toggle-slider"></span>
           </label>
+        </div>
+      </section>
+
+      <section class="settings-group">
+        <h2>Peek</h2>
+
+        <div class="setting-item">
+          <div class="setting-info">
+            <label for="peekModifier">Modifier Key</label>
+            <p class="setting-description">Hold this key and click a link to peek at it without navigating when the site allows embedding</p>
+          </div>
+          <select id="peekModifier">
+            <option value="Alt">Option / Alt</option>
+            <option value="Meta">Command / Win</option>
+            <option value="Control">Control</option>
+          </select>
+        </div>
+
+        <div class="setting-item">
+          <div class="setting-info">
+            <label for="peekSize">Window Size</label>
+            <p class="setting-description">Size of the peek preview panel</p>
+          </div>
+          <div class="slider-control">
+            <input type="range" id="peekSize" min="40" max="96" step="1" value="75">
+            <span class="slider-value" id="peekSizeValue">75%</span>
+          </div>
+        </div>
+
+        <div class="setting-item">
+          <div class="setting-info">
+            <label for="peekBlur">Background Blur</label>
+            <p class="setting-description">Blur intensity of the background when peeking</p>
+          </div>
+          <div class="slider-control">
+            <input type="range" id="peekBlur" min="0" max="20" step="1" value="4">
+            <span class="slider-value" id="peekBlurValue">4px</span>
+          </div>
         </div>
       </section>
 
