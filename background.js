@@ -149,6 +149,51 @@ function scheduleCaptureScreenshot(tabId, windowId, delay = 500) {
   }, delay);
 }
 
+async function openUrlInPopup(url, senderTab, sizePercent = 75) {
+  const popupScale = Math.min(96, Math.max(40, parseInt(sizePercent, 10) || 75)) / 100;
+  const fallbackWindow = {
+    width: 1440,
+    height: 900,
+    left: 100,
+    top: 100
+  };
+
+  let baseWindow = fallbackWindow;
+  if (senderTab?.windowId !== undefined) {
+    try {
+      baseWindow = await chrome.windows.get(senderTab.windowId);
+    } catch (error) {
+      // Fall back to defaults if the source window is unavailable.
+    }
+  }
+
+  const width = Math.max(480, Math.round((baseWindow.width || fallbackWindow.width) * popupScale));
+  const height = Math.max(360, Math.round((baseWindow.height || fallbackWindow.height) * popupScale));
+  const left = Math.round((baseWindow.left || fallbackWindow.left) + ((baseWindow.width || fallbackWindow.width) - width) / 2);
+  const top = Math.round((baseWindow.top || fallbackWindow.top) + ((baseWindow.height || fallbackWindow.height) - height) / 2);
+
+  try {
+    const popupWindow = await chrome.windows.create({
+      url,
+      type: 'popup',
+      focused: true,
+      width,
+      height,
+      left: Math.max(0, left),
+      top: Math.max(0, top)
+    });
+
+    return { success: true, windowId: popupWindow.id };
+  } catch (error) {
+    try {
+      await chrome.tabs.create({ url });
+      return { success: true, fallback: 'tab' };
+    } catch (tabError) {
+      return { success: false, error: tabError.message || error.message };
+    }
+  }
+}
+
 // Listen for tab activation to maintain MRU order and capture screenshot
 chrome.tabs.onActivated.addListener(async (activeInfo) => {
   const tabId = activeInfo.tabId;
@@ -363,6 +408,11 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       .then(tabs => sendResponse({ tabs: tabs }))
       .catch(error => sendResponse({ tabs: [], error: error.message }));
     return true; // Will respond asynchronously
+  } else if (request.action === "openInPopup") {
+    openUrlInPopup(request.url, sender.tab, request.sizePercent)
+      .then(sendResponse)
+      .catch(error => sendResponse({ success: false, error: error.message }));
+    return true;
   } else if (request.action === "openInNewTab") {
     chrome.tabs.create({ url: request.url })
       .then(() => sendResponse({ success: true }))

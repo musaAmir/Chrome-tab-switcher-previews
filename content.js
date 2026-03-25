@@ -879,9 +879,58 @@ async function openPeek(url, title) {
 
   // Track the current URL as user navigates within the iframe
   let currentPeekUrl = url;
+  let peekFallbackShown = false;
+
+  async function fallbackToPeekPopup(fallbackUrl = currentPeekUrl) {
+    if (peekFallbackShown || !peekVisible) return;
+    peekFallbackShown = true;
+    loading.classList.add('loaded');
+
+    try {
+      const response = await chrome.runtime.sendMessage({
+        action: "openInPopup",
+        url: fallbackUrl,
+        sizePercent: currentSettings.peekSize
+      });
+
+      if (response && response.success) {
+        closePeek();
+        return;
+      }
+    } catch (error) {
+      // Fall through to inline error state if popup creation fails.
+    }
+
+    showPeekError(fallbackUrl, true);
+  }
+
+  function detectBlockedEmbedFrame() {
+    try {
+      const frameUrl = iframe.contentWindow?.location?.href || '';
+      const frameTitle = (iframe.contentDocument?.title || '').toLowerCase();
+      const frameText = (iframe.contentDocument?.body?.innerText || '').toLowerCase();
+
+      if (frameUrl.startsWith('chrome-error://')) {
+        return true;
+      }
+
+      return frameTitle.includes('refused to connect') ||
+        frameText.includes('refused to connect') ||
+        frameText.includes('err_blocked_by_response') ||
+        frameText.includes('x-frame-options') ||
+        frameText.includes('content security policy');
+    } catch (error) {
+      return false;
+    }
+  }
 
   iframe.addEventListener('load', () => {
     loading.classList.add('loaded');
+
+    if (detectBlockedEmbedFrame()) {
+      fallbackToPeekPopup(url);
+      return;
+    }
 
     // Try to read the iframe's current URL (works for same-origin navigations)
     try {
@@ -914,7 +963,7 @@ async function openPeek(url, title) {
 
   // Some sites block iframes via X-Frame-Options / CSP — handle gracefully
   iframe.addEventListener('error', () => {
-    showPeekError(url);
+    fallbackToPeekPopup(url);
   });
 
   // Set src after attaching to DOM
@@ -922,9 +971,10 @@ async function openPeek(url, title) {
 
   // After a timeout, if iframe is still "loading", check if it might be blocked
   setTimeout(() => {
-    if (peekVisible && !loading.classList.contains('loaded')) {
-      // Can't reliably detect X-Frame-Options from content script,
-      // but the loading bar will just keep going — that's acceptable
+    if (!peekVisible || peekFallbackShown) return;
+
+    if (detectBlockedEmbedFrame()) {
+      fallbackToPeekPopup(url);
     }
   }, 5000);
 
@@ -958,24 +1008,28 @@ async function openPeek(url, title) {
   document.addEventListener('keydown', handlePeekKeydown, true);
 }
 
-function showPeekError(url) {
+function showPeekError(url, preferPopup = false) {
   if (!peekShadowRoot) return;
   const content = peekShadowRoot.querySelector('.peek-content');
   if (!content) return;
 
-  const isDark = getEffectiveTheme() === 'dark';
+  const primaryButtonLabel = preferPopup ? 'Open in Popup' : 'Open in New Tab';
   content.innerHTML = `
     <div class="peek-error">
       <div class="peek-error-icon">\u26a0\ufe0f</div>
       <div>This site can't be previewed — it blocks embedding.</div>
-      <button class="peek-btn peek-btn-open" id="peek-error-open" style="margin-top: 8px;">Open in New Tab</button>
+      <button class="peek-btn peek-btn-open" id="peek-error-open" style="margin-top: 8px;">${primaryButtonLabel}</button>
     </div>
   `;
 
   const openBtn = peekShadowRoot.getElementById('peek-error-open');
   if (openBtn) {
     openBtn.addEventListener('click', () => {
-      chrome.runtime.sendMessage({ action: "openInNewTab", url: url });
+      chrome.runtime.sendMessage(
+        preferPopup
+          ? { action: "openInPopup", url: url, sizePercent: currentSettings.peekSize }
+          : { action: "openInNewTab", url: url }
+      );
       closePeek();
     });
   }
